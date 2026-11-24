@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pirate Token Duo Counter</title>
+<style>
+:root{color-scheme:dark;--bg:#101827;--panel:#1b293d;--panel2:#24364d;--gold:#f5c451;--green:#39c78a;--muted:#a9b8ca}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(150deg,#101827,#172b3d);color:#f6f8fb;font:16px system-ui, sans-serif}
+main{max-width:760px;margin:auto;padding:24px 16px 48px}.hero{text-align:center;padding:20px 8px 24px}
+h1{font-size:clamp(26px,6vw,40px);margin:0 0 8px}.sub{color:var(--muted);margin:0}
+.panel{background:var(--panel);border:1px solid #34465c;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 8px 24px #0003}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.player{background:var(--panel2);border-radius:14px;padding:16px}.player h2{font-size:17px;margin:0 0 8px}
+.big{font-size:38px;font-weight:800;font-variant-numeric:tabular-nums;margin:2px 0 12px}
+button{border:0;border-radius:11px;padding:11px 14px;background:var(--gold);color:#17202b;font-weight:750;font-size:15px;cursor:pointer;margin:3px}
+button.secondary{background:#3b5068;color:#fff}button.danger{background:#85404a;color:white}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 0}
+.stat{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+label{display:block;color:var(--muted);font-size:14px;margin-bottom:6px}
+input[type=range]{width:100%;accent-color:var(--green)}
+input[type=number]{width:110px;background:#101d2c;color:white;border:1px solid #50647b;border-radius:9px;padding:9px;font-size:16px}
+.track{height:13px;background:#35465b;border-radius:99px;overflow:hidden}.fill{height:100%;width:0;background:var(--green);transition:width .2s}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}.success{color:var(--green);font-weight:750}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+@media(max-width:520px){.grid{grid-template-columns:1fr}.player{padding:14px}}
+</style>
+</head>
+<body><main>
+<header class="hero"><h1>🏴‍☠️ Pirate Token Duo Counter</h1><p class="sub">Yhteinen farmiseuranta kahdelle pelaajalle</p></header>
+<section class="grid">
+ <div class="player"><h2>🧭 Pelaaja 1</h2><div class="big" id="a">0</div><button class="secondary" onclick="change('a',-1)">−1</button><button onclick="change('a',1)">+1 arkku</button><button onclick="change('a',10)">+10</button></div>
+ <div class="player"><h2>⚓ Pelaaja 2</h2><div class="big" id="b">0</div><button class="secondary" onclick="change('b',-1)">−1</button><button onclick="change('b',1)">+1 arkku</button><button onclick="change('b',10)">+10</button></div>
+</section>
+<section class="panel">
+ <label>Yhteensä avattuja arkkuja</label><div class="big" id="total">0</div>
+ <div class="row"><span>Matsit</span><span><button class="secondary" onclick="change('games',-1)">−</button><b class="stat" id="games">0</b><button onclick="change('games',1)">+</button></span></div>
+ <div class="row"><span>Löydetyt tokenit</span><span><button class="secondary" onclick="change('tokens',-1)">−</button><b class="stat" id="tokens">0</b><button onclick="change('tokens',1)">+</button></span></div>
+ <div class="row"><label for="minutes">Peliaika</label><b class="stat"><span id="timeText">4 h 0 min</span></b></div>
+ <input id="minutes" type="range" min="30" max="480" step="30" value="240">
+ <div class="row muted"><span>30 min</span><span>8 tuntia</span></div>
+</section>
+<section class="panel">
+ <label>FARMAUKSEN TEHOKKUUS</label><div class="big"><span id="rate">0</span></div><div class="muted">arkkua tunnissa</div>
+ <div class="row"><span>Matsit tunnissa</span><b id="gamesRate">0</b></div>
+ <hr style="border-color:#34465c">
+ <div class="row"><label for="target">Arkkujen tavoite</label><input id="target" type="number" min="1" max="100000" value="500"></div>
+ <div class="row"><b id="percent">0 %</b><span class="muted" id="remaining">500 arkku(a) jäljellä</span></div>
+ <div class="track"><div class="fill" id="bar"></div></div>
+</section>
+<section class="panel">
+ <div class="row"><b>💾 Tietojen hallinta</b><span class="muted">Tallentuu tähän selaimeen</span></div>
+ <p class="muted">Jos pelaatte eri laitteilla, käyttäkää Vie tiedot / Tuo tiedot vuorotellen. Tämä sivu ei synkronoi muutoksia reaaliajassa laitteiden välillä.</p>
+ <button onclick="exportData()">Vie tiedot</button><button class="secondary" onclick="document.getElementById('importFile').click()">Tuo tiedot</button><input id="importFile" type="file" accept="application/json" hidden>
+ <button class="danger" onclick="resetAll()">Nollaa kaikki</button>
+ <p class="muted" id="notice" aria-live="polite"></p>
+</section>
+<footer>Fortnite-fanien oma laskuri. Ei ole Epic Gamesin virallinen tuote.</footer>
+</main>
+<script>
+const defaults={a:0,b:0,games:0,tokens:0,minutes:240,target:500};
+let s={...defaults};
+try{const saved=JSON.parse(localStorage.getItem('pirateDuoCounter')||'null');if(saved)s={...s,...saved}}catch(e){}
+const $=id=>document.getElementById(id);
+function save(){localStorage.setItem('pirateDuoCounter',JSON.stringify(s));render()}
+function change(k,n){s[k]=Math.max(0,(Number(s[k])||0)+n);save()}
+function render(){
+ for(const k of ['a','b','games','tokens'])$(k).textContent=s[k].toLocaleString('fi-FI');
+ $('total').textContent=(s.a+s.b).toLocaleString('fi-FI');
+ $('minutes').value=s.minutes;$('target').value=s.target;
+ const h=s.minutes/60,total=s.a+s.b,rate=total/h,gr=s.games/h;
+ $('timeText').textContent=`${Math.floor(s.minutes/60)} h ${s.minutes%60} min`;
+ $('rate').textContent=rate.toFixed(1);$('gamesRate').textContent=gr.toFixed(1);
+ const pct=Math.min(100,total/Math.max(1,s.target)*100);
+ $('percent').textContent=pct.toFixed(1)+' %';$('remaining').textContent=Math.max(0,s.target-total).toLocaleString('fi-FI')+' arkku(a) jäljellä';
+ $('bar').style.width=pct+'%';
+}
+$('minutes').addEventListener('input',e=>{s.minutes=+e.target.value;save()});
+$('target').addEventListener('change',e=>{s.target=Math.max(1,+e.target.value||500);save()});
+function exportData(){const blob=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pirate-duo-counter-data.json';a.click();URL.revokeObjectURL(a.href);$('notice').textContent='Tiedot viety JSON-tiedostoon. Lähetä tiedosto kaverille.'}
+$('importFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());s={...defaults,...d};save();$('notice').textContent='Tiedot tuotu onnistuneesti.'}catch(err){$('notice').textContent='Tiedoston lukeminen epäonnistui.'}e.target.value=''});
+function resetAll(){if(confirm('Nollataanko kaikki laskurin tiedot?')){s={...defaults};save();$('notice').textContent='Laskuri nollattu.'}}
+render();
+</script></body></html>
